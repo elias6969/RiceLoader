@@ -29,7 +29,6 @@ void VertFacecounter(const std::string& filePath, std::vector<Vertex>& vertices,
     std::vector<glm::vec3> positions;  // Vertex positions
     std::vector<glm::vec2> texCoords; // Texture coordinates
     std::vector<glm::vec3> normals;   // Normals
-
     std::string line;
     while (std::getline(objFile, line)) {
         if (line.rfind("v ", 0) == 0) { // Parse vertices
@@ -38,10 +37,10 @@ void VertFacecounter(const std::string& filePath, std::vector<Vertex>& vertices,
             ...
         }
     }
-
     objFile.close();
     LoadVerts(vertices, vao, vbo); // Pass data for rendering
 }
+
 2. Loading Vertices for Rendering
 The LoadVerts function prepares vertex data for rendering by setting up VAOs and VBOs:
 
@@ -53,19 +52,17 @@ void LoadVerts(std::vector<Vertex>& verts, unsigned int& vao, unsigned int& vbo)
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(Vertex), verts.data(), GL_STATIC_DRAW);
-
     // Position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
     glEnableVertexAttribArray(0);
-
     // Texture coordinates
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, tx)));
     glEnableVertexAttribArray(1);
-
     // Normals
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, nx)));
     glEnableVertexAttribArray(2);
 }
+
 3. Rendering the Model
 The Draw function uses a shader program to apply transformations and render the model. A simple camera and continuous rotation are implemented:
 
@@ -75,16 +72,14 @@ void Draw(unsigned int& vao, Shader& shader, std::vector<Vertex>& verts) {
     shader.use();
     glm::mat4 view = glm::lookAt(glm::vec3(camX, 0.0f, camZ), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     shader.setMat4("view", view);
-
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
     shader.setMat4("projection", projection);
-
     glm::mat4 model = glm::rotate(glm::mat4(1.0f), static_cast<float>(glfwGetTime()), glm::vec3(0.0f, 1.0f, 5.0f));
     shader.setMat4("model", model);
-
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(verts.size()));
 }
+
 4. Cleaning Up
 The Unload function deletes buffers to free memory:
 
