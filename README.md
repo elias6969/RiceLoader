@@ -1,23 +1,23 @@
 # RiceLoader 🍚
-RiceLoader is a lightweight, self-configured model loader designed to simplify rendering 3D .obj models. This project is still in its early stages but already supports loading basic vertices, texture coordinates, and normals from .obj files and renders them using OpenGL.
+RiceLoader is a lightweight, self-configured model loader designed to simplify rendering 3D .obj models. This project is in its early stages but already supports basic features like loading vertices, texture coordinates, and normals from .obj files and rendering them using OpenGL.
 
-Features
+Features ✨
 Loads .obj files: Reads vertex positions, texture coordinates, and normals.
 Renders models: Displays 3D models with basic transformations and a simple camera view.
 Self-contained: Lightweight and easy to integrate into your projects.
-Work in Progress (WIP)
-Material support: Integrating .mtl for advanced material rendering.
-Enhanced face processing: Optimizing face data handling for complex models.
-Texture mapping: Currently in development.
-How It Works
+🚧 Work in Progress (WIP)
+Material Support: Integration of .mtl files for advanced material rendering.
+Enhanced Face Processing: Optimized handling for complex model data.
+Texture Mapping: Currently under development.
+💡 How It Works
 Core Functions
 1. Reading .obj Files
 The VertFacecounter function processes .obj files, extracting:
 
-Vertices (v),
-Texture Coordinates (vt),
-Normals (vn), and
-Faces (f).
+Vertices (v)
+Texture Coordinates (vt)
+Normals (vn)
+Faces (f)
 cpp
 Copy code
 void VertFacecounter(const std::string& filePath, std::vector<Vertex>& vertices, unsigned int& vao, unsigned int& vbo) {
@@ -40,7 +40,6 @@ void VertFacecounter(const std::string& filePath, std::vector<Vertex>& vertices,
     objFile.close();
     LoadVerts(vertices, vao, vbo); // Pass data for rendering
 }
-
 2. Loading Vertices for Rendering
 The LoadVerts function prepares vertex data for rendering by setting up VAOs and VBOs:
 
@@ -62,9 +61,8 @@ void LoadVerts(std::vector<Vertex>& verts, unsigned int& vao, unsigned int& vbo)
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, nx)));
     glEnableVertexAttribArray(2);
 }
-
 3. Rendering the Model
-The Draw function uses a shader program to apply transformations and render the model. A simple camera and continuous rotation are implemented:
+The Draw function applies transformations and renders the model using a simple camera and continuous rotation:
 
 cpp
 Copy code
@@ -79,9 +77,8 @@ void Draw(unsigned int& vao, Shader& shader, std::vector<Vertex>& verts) {
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(verts.size()));
 }
-
 4. Cleaning Up
-The Unload function deletes buffers to free memory:
+The Unload function deletes buffers to free up memory:
 
 cpp
 Copy code
@@ -89,7 +86,7 @@ void Unload(unsigned int& vao, unsigned int& vbo) {
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
 }
-Getting Started
+🚀 Getting Started
 Prerequisites
 OpenGL 3.3+
 GLFW: For window and input handling.
@@ -102,7 +99,16 @@ Copy code
 git clone https://github.com/yourusername/RiceLoader.git
 cd RiceLoader
 Compile using your favorite build system (e.g., CMake, Makefile).
-Example Output
-Once loaded, RiceLoader displays .obj models with basic transformations like rotation:
+🖼️ Example Output
+RiceLoader renders .obj models with basic transformations like rotation:
 
-Feel free to contribute by submitting issues or pull requests. Let's build something awesome! 🚀
+(Include a screenshot or rendered example here if available)
+
+🤝 Contributing
+Feel free to contribute by submitting issues or pull requests. Let’s build something awesome together! 🚀
+
+🛠️ To-Do
+Improve material handling with .mtl support.
+Implement full texture mapping.
+Optimize vertex and face processing.
+Star this repository if you find it helpful! 🌟
