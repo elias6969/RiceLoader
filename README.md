@@ -17,7 +17,7 @@ RiceLoader renders .obj models with basic transformations like rotation:
 (Include a screenshot or rendered example here if available)
 
 # 🤝 Contributing
-Feel free to contribute by submitting issues or pull requests. Let’s build something awesome together! 🚀
+Feel free to contribute by submitting issues or pull requests
 
 # 🛠️ To-Do
 Improve material handling with .mtl support.
