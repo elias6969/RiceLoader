@@ -5,7 +5,8 @@ RiceLoader is a lightweight, self-configured model loader designed to simplify r
 Loads .obj files: Reads vertex positions, texture coordinates, and normals.
 Renders models: Displays 3D models with basic transformations and a simple camera view.
 Self-contained: Lightweight and easy to integrate into your projects.
-🚧 Work in Progress (WIP)
+
+# 🚧 Work in Progress (WIP)
 Material Support: Integration of .mtl files for advanced material rendering.
 Enhanced Face Processing: Optimized handling for complex model data.
 Texture Mapping: Currently under development.
