@@ -14,8 +14,6 @@ Texture Mapping: Currently under development.
 # 🖼️ Example Output
 RiceLoader renders .obj models with basic transformations like rotation:
 
-(Include a screenshot or rendered example here if available)
-
 # 🤝 Contributing
 Feel free to contribute by submitting issues or pull requests
 
