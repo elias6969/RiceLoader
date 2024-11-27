@@ -4,163 +4,229 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <stb_image/stb_image.h>
-
+#include <unordered_map>
 #include "shader.h"
+#include "camera.h"
+#include "riceLoader.h"
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <string>
-#include "riceLoader.h"
 #include <vector>
 
 
-void VertFacecounter(const std::string& filePath, std::vector<Vertex>& vertices, unsigned int& vao, unsigned int& vbo) {
-    std::ifstream objFile(filePath);
-    if (!objFile.is_open()) {
-        std::cerr << "Error: Could not open file " << filePath << std::endl;
+
+
+// Parse material data from an MTL file
+void LoadMaterial(const std::string& filePath, std::unordered_map<std::string, Material>& materials) {
+    std::ifstream mtlFile(filePath);
+    if (!mtlFile.is_open()) {
+        std::cerr << "Error: Could not open MTL file " << filePath << std::endl;
         return;
     }
 
-    std::vector<glm::vec3> positions;  // To store vertex positions (v)
-    std::vector<glm::vec2> texCoords; // To store texture coordinates (vt)
-    std::vector<glm::vec3> normals;   // To store vertex normals (vn)
+    Material currentMaterial;
+    std::string line, currentMaterialName;
 
-    std::string line;
+    while (std::getline(mtlFile, line)) {
+        std::istringstream lineStream(line);
+        std::string token;
+        lineStream >> token;
+
+        if (token == "newmtl") {
+            if (!currentMaterialName.empty()) {
+                materials[currentMaterialName] = currentMaterial;
+            }
+            lineStream >> currentMaterialName;
+            currentMaterial = Material();
+        }
+        else if (token == "Ka") {
+            lineStream >> currentMaterial.ambient.r >> currentMaterial.ambient.g >> currentMaterial.ambient.b;
+        }
+        else if (token == "Kd") {
+            lineStream >> currentMaterial.diffuse.r >> currentMaterial.diffuse.g >> currentMaterial.diffuse.b;
+        }
+        else if (token == "Ks") {
+            lineStream >> currentMaterial.specular.r >> currentMaterial.specular.g >> currentMaterial.specular.b;
+        }
+        else if (token == "Ns") {
+            lineStream >> currentMaterial.shininess;
+        }
+        else if (token == "map_Kd") {
+            lineStream >> currentMaterial.texturePath;
+        }
+    }
+
+    if (!currentMaterialName.empty()) {
+        materials[currentMaterialName] = currentMaterial;
+    }
+}
+
+// Parse OBJ file and load meshes
+void LoadModel(const std::string& filePath, std::vector<Mesh>& meshes) {
+    std::ifstream objFile(filePath);
+    if (!objFile.is_open()) {
+        std::cerr << "Error: Could not open OBJ file " << filePath << std::endl;
+        return;
+    }
+
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec2> texCoords;
+    std::vector<glm::vec3> normals;
+    std::unordered_map<std::string, Material> materials;
+
+    Mesh currentMesh;
+    std::string line, currentMaterialName;
+
     while (std::getline(objFile, line)) {
-        // Parse vertex positions
-        if (line.rfind("v ", 0) == 0) {
-            float x, y, z;
-            if (sscanf(line.c_str(), "v %f %f %f", &x, &y, &z) != 3) {
-                std::cerr << "Error parsing vertex position: " << line << std::endl;
-                continue;
-            }
-            positions.push_back(glm::vec3(x, y, z));
+        std::istringstream lineStream(line);
+        std::string token;
+        lineStream >> token;
+
+        if (token == "v") {
+            glm::vec3 position;
+            lineStream >> position.x >> position.y >> position.z;
+            positions.push_back(position);
         }
-        // Parse texture coordinates
-        else if (line.rfind("vt ", 0) == 0) {
-            float tx, ty;
-            if (sscanf(line.c_str(), "vt %f %f", &tx, &ty) != 2) {
-                std::cerr << "Error parsing texture coordinates: " << line << std::endl;
-                continue;
-            }
-            texCoords.push_back(glm::vec2(tx, ty));
+        else if (token == "vt") {
+            glm::vec2 texCoord;
+            lineStream >> texCoord.x >> texCoord.y;
+            texCoords.push_back(texCoord);
         }
-        // Parse vertex normals
-        else if (line.rfind("vn ", 0) == 0) {
-            float nx, ny, nz;
-            if (sscanf(line.c_str(), "vn %f %f %f", &nx, &ny, &nz) != 3) {
-                std::cerr << "Error parsing vertex normal: " << line << std::endl;
-                continue;
-            }
-            normals.push_back(glm::vec3(nx, ny, nz));
+        else if (token == "vn") {
+            glm::vec3 normal;
+            lineStream >> normal.x >> normal.y >> normal.z;
+            normals.push_back(normal);
         }
-        // Parse faces
-        else if (line.rfind("f ", 0) == 0) {
-            unsigned int vIdx[3], tIdx[3], nIdx[3];
-            int matches = sscanf(
-                line.c_str(),
-                "f %u/%u/%u %u/%u/%u %u/%u/%u",
-                &vIdx[0], &tIdx[0], &nIdx[0],
-                &vIdx[1], &tIdx[1], &nIdx[1],
-                &vIdx[2], &tIdx[2], &nIdx[2]
-            );
+        else if (token == "f") {
+            unsigned int posIdx, texIdx, normIdx;
+            std::string faceData;
 
-            if (matches != 9) {
-                std::cerr << "Error parsing face data: " << line << std::endl;
-                continue;
+            while (lineStream >> faceData) {
+                if (std::sscanf(faceData.c_str(), "%u/%u/%u", &posIdx, &texIdx, &normIdx) == 3) {
+                    Vertex vertex;
+                    vertex.x = positions[posIdx - 1].x;
+                    vertex.y = positions[posIdx - 1].y;
+                    vertex.z = positions[posIdx - 1].z;
+
+                    vertex.tx = texCoords[texIdx - 1].x;
+                    vertex.ty = texCoords[texIdx - 1].y;
+
+                    vertex.nx = normals[normIdx - 1].x;
+                    vertex.ny = normals[normIdx - 1].y;
+                    vertex.nz = normals[normIdx - 1].z;
+
+                    currentMesh.vertices.push_back(vertex);
+                    currentMesh.indices.push_back(static_cast<unsigned int>(currentMesh.vertices.size() - 1));
+                }
             }
-
-            // Convert indices (OBJ uses 1-based indexing)
-            for (int i = 0; i < 3; i++) {
-                Vertex vertex;
-                vertex.x = positions[vIdx[i] - 1].x;
-                vertex.y = positions[vIdx[i] - 1].y;
-                vertex.z = positions[vIdx[i] - 1].z;
-
-                vertex.tx = texCoords[tIdx[i] - 1].x;
-                vertex.ty = texCoords[tIdx[i] - 1].y;
-
-                vertex.nx = normals[nIdx[i] - 1].x;
-                vertex.ny = normals[nIdx[i] - 1].y;
-                vertex.nz = normals[nIdx[i] - 1].z;
-
-                vertices.push_back(vertex);
+        }
+        else if (token == "usemtl") {
+            if (!currentMesh.vertices.empty()) {
+                meshes.push_back(currentMesh);
+                currentMesh = Mesh();
             }
+            lineStream >> currentMaterialName;
+            currentMesh.material = materials[currentMaterialName];
+        }
+        else if (token == "mtllib") {
+            std::string mtlFile;
+            lineStream >> mtlFile;
+            LoadMaterial(mtlFile, materials);
         }
     }
 
-    objFile.close();
-
-    std::cout << "Vertices: " << positions.size() << std::endl;
-    std::cout << "Texture coordinates: " << texCoords.size() << std::endl;
-    std::cout << "Normals: " << normals.size() << std::endl;
-    std::cout << "Final Vertices (after faces processed): " << vertices.size() << std::endl;
-
-    for (const auto& vertex : vertices) {
-        std::cout << "Vertex: " << vertex.x << ", " << vertex.y << ", " << vertex.z
-            << " | Texture Coords: " << vertex.tx << ", " << vertex.ty
-            << " | Normals: " << vertex.nx << ", " << vertex.ny << ", " << vertex.nz << std::endl;
+    if (!currentMesh.vertices.empty()) {
+        meshes.push_back(currentMesh);
     }
-
-    LoadVerts(vertices, vao, vbo);
 }
 
-void LoadVerts(std::vector<Vertex> &verts, unsigned int &vao, unsigned int &vbo) {
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(1, &vbo);
-	glBindVertexArray(vao);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(Vertex), verts.data(), GL_STATIC_DRAW);
-	// Define how to interpret the vertex data (just position here)
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-	glEnableVertexAttribArray(0);
+// Bind mesh data to GPU
+void LoadMeshToGPU(const Mesh& mesh, unsigned int& vao, unsigned int& vbo, unsigned int& ebo) {
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
 
-	// Texture Coordinates attribute
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, tx)));
-	glEnableVertexAttribArray(1);
+    glBindVertexArray(vao);
 
-	// Normal attribute
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, nx)));
-	glEnableVertexAttribArray(2);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex), mesh.vertices.data(), GL_STATIC_DRAW);
 
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int), mesh.indices.data(), GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, tx)));
+    glEnableVertexAttribArray(1);
+
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, nx)));
+    glEnableVertexAttribArray(2);
+
+    glBindVertexArray(0);
 }
 
-void Draw(unsigned int& vao, Shader& shader, std::vector<Vertex>& verts){
+// Render the mesh
+void Draw(
+    unsigned int& vao, Shader& shader, Mesh& mesh, Material& material,
+    Camera& camera, const unsigned int SCR_WIDTH, const unsigned int SCR_HEIGHT,
+    glm::vec3 lightPos, glm::vec3 lightColor)
+{
     // Use the shader program
     shader.use();
 
-    // View matrix for camera movement (simple orbiting camera)
-    glm::mat4 view = glm::mat4(1.0f);
-    float radius = 10.0f;
-    float camX = static_cast<float>(sin(glfwGetTime()) * radius);
-    float camZ = static_cast<float>(cos(glfwGetTime()) * radius);
-    view = glm::lookAt(glm::vec3(camX, 0.0f, camZ), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    // Set view matrix from camera
+    glm::mat4 view = camera.GetViewMatrix();
     shader.setMat4("view", view);
 
-    // Projection matrix (Perspective Projection)
+    // Set projection matrix (Perspective Projection)
     glm::mat4 projection = glm::perspective(
-        glm::radians(45.0f),  // Field of view
-        800.0f / 600.0f,      // Aspect ratio (adjust as per your window size)
-        0.1f,                 // Near clipping plane
-        100.0f                // Far clipping plane
+        glm::radians(camera.Zoom), // Field of view
+        static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT), // Aspect ratio
+        0.1f, // Near clipping plane
+        100.0f // Far clipping plane
     );
     shader.setMat4("projection", projection);
 
-    // Model matrix (for positioning, scaling, and rotating the object)
+    // Set model matrix (Positioning, Scaling, Rotation)
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::rotate(model, static_cast<float>(glfwGetTime()), glm::vec3(0.0f, 1.0f, 5.0f));  // Continuous rotation
+    model = glm::rotate(model, static_cast<float>(glfwGetTime()), glm::vec3(0.0f, 1.0f, 0.0f)); // Continuous rotation
     shader.setMat4("model", model);
+
+    // Set light properties
+    shader.setVec3("lightPos", lightPos);
+    shader.setVec3("lightColor", lightColor);
+
+    // Set camera position
+    shader.setVec3("viewPos", camera.Position);
+
+    // Bind material properties
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, material.diffuseTexture);
+    shader.setInt("material.diffuse", 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, material.specularTexture);
+    shader.setInt("material.specular", 1);
+
+    shader.setFloat("material.shininess", material.shininess);
 
     // Bind the VAO and draw the object
     glBindVertexArray(vao);
-    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(verts.size()));
-    glBindVertexArray(0);  // Unbind the VAO (good practice)
+    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(mesh.vertices.size()));
+    glBindVertexArray(0); // Unbind the VAO (good practice)
 }
 
-void Unload(unsigned int& vao, unsigned int& vbo) {
-    // Delete the VAO and VBO
+
+// Free resources
+void Unload(unsigned int& vao, unsigned int& vbo, unsigned int& ebo) {
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
+    glDeleteBuffers(1, &ebo);
 
-    vao = 0;  // Reset to 0 for safety
+    vao = 0;
     vbo = 0;
+    ebo = 0;
 }
+
